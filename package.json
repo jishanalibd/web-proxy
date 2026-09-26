@@ -1,0 +1,16 @@
+{
+  "name": "bdwebs-web-proxy",
+  "version": "1.0.0",
+  "description": "High-performance anti-framing reverse proxy with cookie, session, and redirect rewriting for BDWebs Desk",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

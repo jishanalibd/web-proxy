@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  web-proxy:
+    build: .
+    container_name: bdwebs-web-proxy
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      # Optional: set a token if you want to restrict proxy usage
+      # - PROXY_TOKEN=bdwebs_proxy_secret_key_2026
