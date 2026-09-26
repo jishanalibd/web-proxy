@@ -39,6 +39,10 @@ const INJECTED_HELPER_SCRIPT = `
     Object.defineProperty(window, 'parent', { get: function() { return window.self; } });
   } catch (e) {}
 
+  var currentUrlParams = new URLSearchParams(window.location.search);
+  var currentToken = currentUrlParams.get('token');
+  var tokenParam = currentToken ? ('&token=' + encodeURIComponent(currentToken)) : '';
+
   // Intercept links to keep navigation inside the proxy
   document.addEventListener('click', function(e) {
     var target = e.target;
@@ -49,8 +53,8 @@ const INJECTED_HELPER_SCRIPT = `
       var href = target.href;
       if (href.indexOf('/proxy?url=') !== -1 || href.startsWith('mailto:') || href.startsWith('tel:')) return;
       e.preventDefault();
-      var proxyBase = window.location.origin + '/proxy?url=';
-      window.location.href = proxyBase + encodeURIComponent(href);
+      var proxyBase = window.location.origin + '/proxy?url=' + encodeURIComponent(href) + tokenParam;
+      window.location.href = proxyBase;
     }
   }, true);
 
@@ -60,8 +64,8 @@ const INJECTED_HELPER_SCRIPT = `
     if (form && form.action) {
       var action = form.action;
       if (action.indexOf('/proxy?url=') === -1) {
-        var proxyBase = window.location.origin + '/proxy?url=';
-        form.action = proxyBase + encodeURIComponent(action);
+        var proxyBase = window.location.origin + '/proxy?url=' + encodeURIComponent(action) + tokenParam;
+        form.action = proxyBase;
       }
     }
   }, true);
@@ -89,7 +93,7 @@ function decompressBuffer(buffer, encoding, callback) {
 /**
  * Main Proxy Handler
  */
-function handleProxyRequest(req, res, targetUrlStr) {
+function handleProxyRequest(req, res, targetUrlStr, tokenStr) {
   let parsedTarget;
   try {
     if (!targetUrlStr.startsWith('http://') && !targetUrlStr.startsWith('https://')) {
@@ -163,7 +167,8 @@ function handleProxyRequest(req, res, targetUrlStr) {
     if (statusCode >= 300 && statusCode < 400 && incomingHeaders['location']) {
       try {
         const resolvedRedirect = new urlModule.URL(incomingHeaders['location'], targetUrlStr).href;
-        incomingHeaders['location'] = `/proxy?url=${encodeURIComponent(resolvedRedirect)}`;
+        const tokenParam = tokenStr ? `&token=${encodeURIComponent(tokenStr)}` : '';
+        incomingHeaders['location'] = `/proxy?url=${encodeURIComponent(resolvedRedirect)}${tokenParam}`;
       } catch (err) {
         // preserve location if parsing fails
       }
@@ -322,10 +327,10 @@ const server = http.createServer((req, res) => {
   }
 
   const targetUrl = parsedReq.searchParams.get('url');
+  const providedToken = parsedReq.searchParams.get('token') || req.headers['x-proxy-token'] || '';
 
   // Token authentication if configured
   if (PROXY_TOKEN) {
-    const providedToken = parsedReq.searchParams.get('token') || req.headers['x-proxy-token'];
     if (providedToken !== PROXY_TOKEN) {
       res.writeHead(401, { 'Content-Type': 'application/json', ...CORS_HEADERS });
       return res.end(JSON.stringify({ error: 'Unauthorized: Invalid or missing proxy token.' }));
@@ -333,7 +338,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (targetUrl) {
-    return handleProxyRequest(req, res, targetUrl);
+    return handleProxyRequest(req, res, targetUrl, providedToken);
   }
 
   // Fallback to landing page
